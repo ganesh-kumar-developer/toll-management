@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Toll Management</title>
+	<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+	<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+	<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+	<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=PT+Sans&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="style.css">
+	<script src="index.js"></script>
+</head>
+
+<body>
+	<div id="root"> </div>
+	<script type="text/babel">
+		const { useState } = React;
+		const { useEffect } = React;
+		function MyApp() {
+
+			if (localStorage.tolls) {
+				let localItems = window.localStorage.getItem('tolls');
+				tolls = JSON.parse(localItems);
+			}
+
+			if (localStorage.vehicle_entries) {
+				let localItems = window.localStorage.getItem('vehicle_entries');
+				vehicle_entries = JSON.parse(localItems);
+			}
+
+			if (localStorage.toll_names) {
+				let localItems = window.localStorage.getItem('toll_names');
+				toll_names = JSON.parse(localItems);
+			}
+
+			let [tollNames, setTollNames] = useState(toll_names);
+			let [tollFilter, setTollFilter] = useState('all');
+			let [vehicleNumFilter, setvehicleNumFilter] = useState('');
+			let [tollNameFilter, setTollNameFilter] = useState('');
+			let [tollList, setTollList] = useState(tolls);
+			let [entryList, setEntryList] = useState(vehicle_entries);
+			let [tollListVisbile, setTollListVisbile] = useState(false);
+			let [entryListVisbile, setEntryListVisbile] = useState(true);
+
+			function handleTollPopup(tollData) {;
+				setTollList([...tollList, new Toll(tollData)]);
+				setTollNames([...tollNames, tollData.name]);
+			}
+
+			function handleEntryPopup(entryData) {
+				setEntryList([...entryList, new Entry(entryData)]);
+			}
+
+			function handleTollFiletr(value) {
+				setTollFilter(value)
+			}
+
+			function handleTollToggle() {
+				tollListVisbile ? setTollListVisbile(false) : setTollListVisbile(true);
+				entryListVisbile ? setEntryListVisbile(false) : setEntryListVisbile(true);
+			}
+
+			function handleVechileNumFilter(search_term) {
+				setvehicleNumFilter(search_term);
+			}
+
+			function handleTollNameFilter(search_term) {
+				setTollNameFilter(search_term);
+			}
+
+			function handleRemoveToll(index) {
+				let tollName = tollList[index].name;
+				for (let i=0; i<tollNames.length; i++) {
+					if (tollNames[i] == tollName) {
+						tollNames.splice(i, 1);
+						break;
+					}
+				}
+				tollList.splice(index, 1);
+				setTollList([...tollList]);
+				setTollNames([...tollNames]);	
+			}
+
+			useEffect(() => {
+				localStorage.setItem("vehicle_entries", JSON.stringify(entryList));
+			}, [entryList]);
+
+			useEffect(() => {
+				localStorage.setItem("tolls", JSON.stringify(tollList));
+				localStorage.setItem("toll_names", JSON.stringify(tollNames));
+			}, [tollList]);
+
+			return (
+				<div className="container">
+					<Header />
+					<Topbar tollNames={ tollNames } tollFilter={ handleTollFiletr } selecteToll={tollFilter}
+							tollToggle={ handleTollToggle } tollVisible={ tollListVisbile } 
+							vechileNumFilter={ handleVechileNumFilter } tollNameFilterFn={ handleTollNameFilter }/>
+					{
+						entryListVisbile && 
+						( <EntryList list={ entryList } entryFilter={ tollFilter } vechileNumberFilter={ vehicleNumFilter }/> ) 
+					}
+					{ 
+						tollListVisbile && 
+						( <TollList list={ tollList } tollNameFilters={ tollNameFilter } removeToll = { handleRemoveToll }/> ) 
+					}
+					<TollModalPopup tollData={ handleTollPopup }/>
+					<VehiclePopup entryData={ handleEntryPopup } tollNames={ tollNames } tolls={ tollList } />
+					<Toast />
+				</div>
+			);
+		}
+
+		function EntryList(props) {
+			let showNoRecords = true;
+			return(
+				<div className="w-100 overflow-x mt-20">
+					<table className="vechile">
+						<thead>
+							<tr>
+								<th className="type">VECHILE TYPE</th>
+								<th className="number">VECHILE NUMBER</th>
+								<th className="date-time">DATE/TIME</th>
+								<th className="name">TOLL NAME</th>
+								<th className="traffic">TRAFFIC</th>
+							</tr>
+						</thead>
+						<tbody>
+						{props.list.filter((data) => {
+							if (props.entryFilter == 'all' && props.vechileNumberFilter == '') {
+								showNoRecords = false;
+								return true;
+							}
+							if (props.entryFilter != 'all' && props.vechileNumberFilter != '') {
+								if (data.toll_name == props.entryFilter && data.vechile_number.toLowerCase().includes(props.vechileNumberFilter.toLowerCase())) {
+									showNoRecords = false;
+									return true;
+								} else {
+									return false;
+								}
+							}
+							if (props.entryFilter != 'all' && props.vechileNumberFilter == '') {
+								if (data.toll_name == props.entryFilter) {
+									showNoRecords = false;
+									return true;
+								} else {
+									return false;
+								}
+							}
+							if (data.vechile_number.toLowerCase().includes(props.vechileNumberFilter.toLowerCase())) {
+								showNoRecords = false;
+								return true;
+							}
+							return false;
+						}).map((transction, index) => 
+							<tr key={index}>
+								<td>{transction.vechile_type}</td>
+								<td>{transction.vechile_number}</td>
+								<td>{transction.date_time}</td>
+								<td>{transction.toll_name}</td>
+								<td>{transction.tariff}</td>
+							</tr>
+						)}
+						{
+							(showNoRecords) && <>
+							<tr>
+								<td colSpan="5" className="text-center">No vehicle entries found </td>
+							</tr>
+							</>
+						}
+					</tbody>
+					</table>
+				</div>
+			)
+		}
+
+		function TollList(props) {
+			let showNoRecords = true;
+			function removeToll(index) {
+				props.removeToll(index);
+			}
+			return(
+				<div className="w-100 overflow-x mt-20">
+					<table>
+						<thead>
+							<tr>
+								<th className="toll-name">TOLL NAME</th>
+								<th className="type-1">CAR/JEEP/VAN</th>
+								<th className="type-2">LCV</th>
+								<th className="type-3">TRUCK/BUS</th>
+								<th className="type-4">HEAVY VEHICLE</th>
+								<th className="hd-remove"></th>
+							</tr>
+						</thead>
+						<tbody>
+						{props.list.filter((data) => {
+							if (props.tollNameFilters != '') {
+								if (data.name.toLowerCase().includes(props.tollNameFilters.toLowerCase())) {
+									showNoRecords = false;
+									return true;
+								}
+								else {
+									return false;
+								}
+							}
+							showNoRecords = false;
+							return true;
+						}).map((toll, index) => 
+							<tr key={index}>
+								<td>{toll.name}</td>
+								{toll.vechile_types.map((vechile_type, index) =>
+								<td key={index}>{vechile_type.single_entry} / {vechile_type.return_entry}</td>
+								)}
+								<td>
+									<div className="remove" onClick={ () => {removeToll(index)}}>
+										<i className="fa fa-trash-o" aria-hidden="true"></i>
+									</div>
+								</td>
+							</tr>
+						)}
+						{
+							(showNoRecords) && <>
+							<tr>
+								<td colSpan="6" className="text-center">Toll not found </td>
+							</tr>
+							</>
+						}
+					</tbody>
+					</table>
+				</div>
+			)
+		}
+
+		function SearchBox(props) {
+			function onTollChange(tollName) {
+				props.tollFilter(tollName);
+				tickChange(tollName);
+				let elements = document.getElementById('toll_filter').querySelectorAll("span");
+				let clickFilter = 'filter_' + tollName;
+				for (var i=0; i<elements.length; i++) {
+					elements[i].classList.remove("fa-check");
+					if (elements[i].id.toLowerCase() == clickFilter.toLowerCase()) {
+						elements[i].classList.add("fa-check");
+					}
+				}
+			}
+			function tickChange(tollName) {
+				let filterName = tollName ? tollName : props.selecteToll;
+				let element = document.getElementById('toll_filter') || false;
+				if (element) {
+					let elements = element.querySelectorAll("span");
+					let clickFilter = 'filter_' + filterName;
+					for (var i=0; i<elements.length; i++) {
+						elements[i].classList.remove("fa-check");
+						if (elements[i].id.toLowerCase() == clickFilter.toLowerCase()) {
+							elements[i].classList.add("fa-check");
+						}
+					}
+				}
+			}
+			function onSearchChange(term) {
+				props.vechileNumFilter(term);
+			}
+			function onSearchChangeToll(term) {
+				props.tollNameFilterFn(term);
+			}
+			useEffect(() => {
+				tickChange();
+			});
+			return(
+				<>
+					<div className="search-bar d-flex">
+						{ props.tollVisible && <h4>Tollgate list</h4> }
+						{ !props.tollVisible && <h4 className="w-60">Toll/Vehicle Entries</h4> }
+						{
+							!props.tollVisible && <>
+							<div className="ml-10 disabled"> | </div>
+							<div className="dropdown">
+								<div className="ml-10 fa fa-filter"></div>
+								<div className="dropdown-content" id="toll_filter">
+									<p onClick={ (e) => {onTollChange('all')} }>All
+										<span id="filter_all" className="fa fa-check"></span>
+									</p>
+									{props.tollNames.map((tollName, index) => 
+										<p key={index} value={tollName} defaultValue='' onClick={ (e) => {onTollChange(tollName)} }>{tollName} 
+											<span id={"filter_" + tollName} className="fa"></span>
+										</p>
+									)}
+								</div>
+							</div>
+							</>
+						}
+						{
+							!props.tollVisible && <div className="search ml-10">
+								<input placeholder="Search Vehicle" id="search-vehicle" onChange={ (e) => {onSearchChange(e.target.value)} }/>
+							<span className="fa fa-search"></span>
+							</div>
+						}
+						{
+							props.tollVisible && <div className="search ml-10 w-69">
+								<input placeholder="Search Toll" id="search-toll" onChange={ (e) => {onSearchChangeToll(e.target.value)} }/>
+								<span className="fa fa-search"></span>
+							</div>
+						}
+					</div>
+				</>
+			)
+		}
+
+		function BtnCtrls(props) {
+			return(
+				<div className='btn-ctrls'>
+					<button className="btn btn-primary" onClick={ () => {openPopup('entry-modal')}}>Add vehicle entry</button>
+					<button className="btn btn-primary ml-10"  onClick={ () => {openPopup('toll-modal')}}>Add new toll</button>
+					{ !props.tollVisible && <button className="btn btn-primary ml-10" onClick={ () => { props.tollToggle() }}>View all tolls</button>}
+					{ props.tollVisible && <button className="btn btn-primary ml-10" onClick={ () => { props.tollToggle() }}>Back to vehicle logs</button> }
+				</div>
+			)
+		}
+
+		function Topbar(props) {
+			return(
+				<div className='toolbar'>
+					<SearchBox tollNames={ props.tollNames } tollFilter={ props.tollFilter } tollNameFilterFn={ props.tollNameFilterFn } tollVisible={ props.tollVisible } vechileNumFilter={props.vechileNumFilter} selecteToll = { props.selecteToll }/>
+					<BtnCtrls tollToggle={ props.tollToggle } tollVisible={ props.tollVisible } />
+				</div>
+			)
+		}
+
+		function Header() {
+			return(
+				<div className="header">
+					<h3>Toll Management Application</h3>
+					<hr />
+				</div>
+			)
+		}
+		
+		function VehiclePopup(props) {
+			let [data, setData] = useState(new Entry({"vechile_type": vechile_types[0].value, toll_name: props.tollNames[0], entry_type: ''}));
+			function addEntry(data) {
+				if (!validateEntry())
+					return false;
+				data.date_time = new Date().toLocaleString();
+				props.entryData(data);
+				setData(new Entry({}));
+				showToast({status: 'success', message: 'Entry added successfully'});
+			}
+			function validateEntry() {
+				let elements = document.getElementById('entry-modal').querySelectorAll("input, select");	
+				for (var i=0; i<elements.length; i++) {
+					elements[i].classList.remove("invalid");
+					if (!elements[i].value) {
+						elements[i].classList.add("invalid");
+						showToast({status: 'error', message: 'Please fill required fields'});
+						return false;
+					}
+				}
+				return true;
+			}
+			function changeJourneyType(e) {
+				data.entry_type = e.target.value;
+				setData({...data});
+			}
+			useEffect(() => {
+				let amount = 0;
+				for (let i=0; i<props.tolls.length; i++) {
+					let toll = props.tolls[i];
+					if (toll.name == data.toll_name) {
+						for (let j=0; j<toll.vechile_types.length; j++) {
+							if (toll.vechile_types[j].category == data.vechile_type) {
+								if (data.entry_type == 'Single journey') {
+									data.tariff = toll.vechile_types[j].single_entry;
+									setData({...data});
+									break;
+								}
+								if (data.entry_type == 'Return journey') {
+									data.tariff = toll.vechile_types[j].return_entry;
+									setData({...data});
+									break;
+								}
+							}
+						}
+					}
+				}
+			}, [data.entry_type]);
+			return (
+				<div id="entry-modal" className="modal">
+					<div className="modal-content">
+						<button className="popup-close close">✖</button>
+						<h2 className="text-center mt-0">Add new entry</h2>
+						<label htmlFor="entry_name" className="label"> Select Toll Name <span className="star"> * </span> </label>
+						<select name="" id="entry_name" className="select" value={data.toll_name} onChange={ (e) => { data.toll_name = e.target.value; setData({...data}); }} >
+							{props.tollNames.map((tollName, index) => 
+								<option key={index} value={tollName} defaultValue=''>{tollName}</option>
+							)}
+						</select>
+						<label htmlFor="entry_vechile" className="label"> Select vehicle type <span className="star"> * </span> </label>
+						<select name="" id="entry_vechile" className="select" value={data.vechile_type} onChange={ (e) => {data.vechile_type = e.target.value; setData({...data}); } }>
+							{vechile_types.map((vechile_type, index) => 
+								<option key={index} value={vechile_type.value} disabled={vechile_type.disable} defaultValue=''>{vechile_type.label}</option>
+							)}
+						</select>
+						<label htmlFor="entry_type" className="label"> Select journey type <span className="star"> * </span> </label>
+						<select name="" id="entry_type" className="select" value={data.entry_type} onChange={ (e) => {changeJourneyType(e)} }>
+							<option value='' defaultValue=''>-- Select Journey --</option>
+							<option value='Single journey' defaultValue=''>Single journey</option>
+							<option value='Return journey' defaultValue=''>Return journey</option>
+						</select>
+
+						<label htmlFor="vehicle_number" className="label">Vehicle number <span className="star"> * </span> </label>
+						<input id="vehicle_number" placeholder="Enter vechile number" className="textbox"  value={data.vechile_number || ''} onChange={ (e) => { data.vechile_number = e.target.value; setData({...data}); } }/>
+
+						<label htmlFor="tariff_number" className="label">Tariff <span className="star"> * </span> </label>
+						<input id="tariff_number" placeholder="Tariff amount" className="textbox disabled"  value={data.tariff} onChange={ (e) => {data.tariff = e.target.value; setData({...data});  } } disabled/>
+						<button className="popup-accept text-center" onClick={() => {addEntry(data);}}>Add details</button>
+					</div>
+				</div>
+			);
+		}
+
+		function TollModalPopup(props) {
+			let [data, setData] = useState(new Toll({}));
+			function addToll(data) {
+				if (!validateToll())
+					return false;
+				props.tollData(data);
+				setData(new Toll({}));
+				let modal = document.getElementById('toll-modal');
+				modal.style.opacity = "0";
+				modal.style.visibility = "hidden";
+				showToast({status: 'success', message: 'Toll added successfully'});
+			}
+			function validateToll() {
+				let elements = document.getElementById('toll-modal').querySelectorAll("input, select");	
+				for (var i=0; i<elements.length; i++) {
+					elements[i].classList.remove("invalid");
+					if (!elements[i].value) {
+						elements[i].classList.add("invalid");
+						showToast({status: 'error', message: 'Please fill required fields'});
+						return false;
+					}
+				}
+				return true;
+			}
+			return (
+				<div id="toll-modal" className="modal">
+					<div className="modal-content">
+						<button className="popup-close close">✖</button>
+						<h2 className="text-center mt-0">Add new toll</h2>
+						<label htmlFor="toll_name" className="label">Toll Name <span className="star"> * </span> </label>
+						<input id="toll_name" placeholder="Enter toll name" className="textbox"  value={data.name} onChange={ (e) => { data.name = e.target.value; setData({...data}); } }/>
+						<label className="label mt-10">Vehicle fare details <span className="star"> * </span></label>
+						{ data.vechile_types.map((data_vech, index) => 
+							<div key={index}>
+								<div> {data.vechile_types.single_entry} </div>
+								<div> {data.vechile_types.return_entry} </div>
+								<div className="d-flex space-between">
+									<select name="" id="" className="select" value={data_vech.category} onChange={ (e) => { data_vech.category = e.target.value; setData({...data}); }} >
+										<option value="">Select vehicle type</option>
+										{vechile_types.map((vechile_type, index) => 
+											<option key={index} value={vechile_type.value} disabled={vechile_type.disable} defaultValue=''>{vechile_type.label}</option>
+										)}
+									</select>
+									<input type="number" id={"signle_fare_" + index} placeholder="Single Journey" className="textbox ml-15" value={data_vech.single_entry} onChange={ (e) => { data_vech.single_entry = e.target.value; setData({...data}); } }/>
+									<input type="number" id="return_fare" placeholder="Return Journey" className="textbox ml-15" value={data_vech.return_entry} onChange={ (e) => { data_vech.return_entry = e.target.value; setData({...data}); } }/>
+								</div>
+							</div>
+						)}
+						<button className="popup-accept text-center" onClick={() => {addToll(data);}}>Add details</button>
+					</div>
+				</div>
+			);
+		}
+		
+		function Toast() {
+			return (
+				<div id="toast-wrapper">
+					<div id="toast-status" className="toast">
+						<div className="outer-container">
+							<i id="fa-icon" className="fa"></i>
+						</div>
+						<div className="inner-container">
+							<p id="toast-message"></p>
+						</div>
+						<button className="popup-close close close-toast">✖</button>
+					</div>
+				</div>
+			);
+		}
+
+		const container = document.getElementById('root');
+		const root = ReactDOM.createRoot(container);
+		root.render(<MyApp />);
+	</script>
+</body>
+
+</html>
